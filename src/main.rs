@@ -1,39 +1,57 @@
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use ratatui::widgets::Paragraph;
+use ratatui::{widgets::Paragraph, Frame};
 
-fn main() -> Result<()> {
-    // enter the alternate screen, enable raw mode, set terminal and backend
+struct App {
+    counter: i32,
+    should_exit: bool
+}
+
+fn render_ui(app: &mut App, frame: &mut Frame<'_>) {
+    let widget = Paragraph::new(format!("counter: {}", app.counter));
+    let area = frame.area();
+    frame.render_widget(widget, area);
+}
+
+fn update_app(app: &mut App) -> Result<()> {
+    match event::read()? {
+        Event::Key(key_event) => {
+            match key_event.kind {
+                KeyEventKind::Press => {
+                    match key_event.code {
+                        KeyCode::Char('q') => app.should_exit = true,
+                        KeyCode::Up => app.counter += 1,
+                        KeyCode::Down => app.counter -= 1,
+                        _ => {}
+                    }
+                },
+                _ => {}
+            }
+        },
+        _ => {}
+    }
+    Ok(())
+}
+
+fn run() -> Result<()> {
     let mut terminal = ratatui::init();
-    // main loop
-    let mut counter = 0;
+
+    let mut app = App{
+        counter: 0,
+        should_exit: false,
+    };
+
     loop {
-        // draw
-        terminal.draw(|frame| {
-            let area = frame.area();
-            let widget = Paragraph::new(format!("counter: {}", counter));
-            frame.render_widget(widget, area);
-        })?;
-        
-        // handle events
-        match event::read()? {
-            Event::Key(key_event) => {
-                match key_event.kind {
-                    KeyEventKind::Press => {
-                        match key_event.code {
-                            KeyCode::Char('q') => break,
-                            KeyCode::Up => counter += 1,
-                            KeyCode::Down => counter -= 1,
-                            _ => {}
-                        }
-                    },
-                    _ => {}
-                }
-            },
-            _ => {}
-        }
+        terminal.draw(|frame| render_ui(&mut app, frame))?;
+        update_app(&mut app)?;
+        if app.should_exit == true { break; }
     }
 
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    run()?;
     ratatui::restore();
     Ok(())
 }
